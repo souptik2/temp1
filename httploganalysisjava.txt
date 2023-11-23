@@ -1,0 +1,76 @@
+package loganalyzer;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
+
+
+public class LogFileAnalyzer {
+	
+	/*
+	 * author: Souptik Das
+	 * desc: Reads file from the given path and fetches keyword present lines along with three lines above and three lines below.
+	 * other info: It will fetch latest 5 keywords and their corresponding lines.
+	 * 
+	 * */
+
+    public static String analyzeLogFile(String path, List<String> keywords) throws IOException {
+        StringBuilder results = new StringBuilder();
+        LinkedList<String> lastThreeLines = new LinkedList<>();
+        LinkedList<String> foundMatches = new LinkedList<>();
+
+        int lineNumber = 0;
+
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                lineNumber++;
+                lastThreeLines.add("Line " + lineNumber + ": " + line);
+
+                if (lastThreeLines.size() > 4) {
+                    lastThreeLines.removeFirst();
+                }
+
+                for (String keyword : keywords) {
+                    if (line.contains(keyword)) {
+                 
+                        StringBuilder match = new StringBuilder();
+                        match.append("======> Found Keyword : '").append(keyword).append("' at Line : ").append(lineNumber).append(" <=============\n\n");
+                        for (String prevLine : lastThreeLines) {
+                        	// Read 2 lines before
+                            match.append(prevLine).append("\n");
+                        }
+                        
+
+                        // Read 3 lines after the line containing the keyword
+                        for (int i = 0; i < 3; i++) {
+                            lineNumber++;
+                            if ((line = br.readLine()) != null) {
+                                match.append("Line ").append(lineNumber).append(": ").append(line).append("\n");
+                            } else {
+                                break;
+                            }
+                        }
+                        match.append("==============XXX==========\n\n\n");
+
+                        foundMatches.add(match.toString());
+
+                        // Keep only the latest 5 matches
+                        if (foundMatches.size() > 5) {
+                            foundMatches.removeFirst();
+                        }
+                        break; // Exit the keyword loop since we found a match
+                    }
+                }
+            }
+        }
+        for (String match : foundMatches) {
+            results.append(match);
+        }
+
+        return results.toString();
+
+    }
+}
