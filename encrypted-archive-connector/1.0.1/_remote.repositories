@@ -1,0 +1,5 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Fri May 17 17:06:54 IST 2024
+encrypted-archive-connector-1.0.1.pom>=
+encrypted-archive-connector-1.0.1-extension-model-4.1.1.json>=
+encrypted-archive-connector-1.0.1-mule-plugin.jar>=
