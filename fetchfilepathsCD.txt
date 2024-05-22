@@ -1,0 +1,251 @@
+package mule.extension.Demo.internal;
+
+import static org.mule.runtime.extension.api.annotation.param.MediaType.ANY;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.net.ftp.FTPClient;
+import org.apache.commons.net.ftp.FTPFile;
+
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.JSchException;
+import com.jcraft.jsch.Session;
+import com.jcraft.jsch.SftpException;
+
+import org.mule.runtime.extension.api.annotation.param.MediaType;
+import org.mule.runtime.extension.api.annotation.param.Optional;
+import org.mule.runtime.extension.api.annotation.param.display.Password;
+import org.mule.runtime.extension.api.annotation.param.display.Summary;
+import org.springframework.context.annotation.Description;
+import org.mule.runtime.extension.api.annotation.Alias;
+import org.mule.runtime.extension.api.annotation.param.Config;
+import org.mule.runtime.extension.api.annotation.param.Connection;
+
+
+/**
+ * This class is a container for operations, every public method in this class will be taken as an extension operation.
+ */
+public class ListFilePathsOperations {
+
+  /**
+   * Example of an operation that uses the configuration and a connection instance to perform some action.
+   */
+  /*@MediaType(value = ANY, strict = false)
+  public String retrieveInfo(@Config ListFilePathsConfiguration configuration, @Connection ListFilePathsConnection connection){
+    return "Using Configuration [" + configuration.getConfigId() + "] with Connection id [" + connection.getId() + "]";
+  }*/
+	
+	/**
+	   * Provides the path of the files in the given directory.
+	   */
+	  @MediaType(value = ANY, strict = false)
+	  @Summary("Provides the path of the files in the given directory.")
+	  public String[] getFilePath(@Alias("directoryPath") String directoryPath,@Optional @Alias("regex") String regex) throws IllegalArgumentException  {
+		  directoryPath.replace("\\", "/");
+	      System.out.println("========= PATH: " + directoryPath + " REGEX: " +regex);  
+		  try {
+	            File directory = new File(directoryPath);
+	            if (!directory.exists() || !directory.isDirectory()) {
+	                throw new IllegalArgumentException("Invalid file path: " + directoryPath);
+	            }
+	            
+	            File[] files = directory.listFiles();
+	            List<String> filePaths  = new ArrayList<>();
+	            
+	            if (files != null) {
+	                Pattern pattern = null;
+	                if (regex != null && !regex.isEmpty()) {
+	                    try {
+	                        pattern = Pattern.compile(regex);
+	                    } catch (Exception e) {
+	                        throw new IllegalArgumentException("Invalid regex pattern: " + regex, e);
+	                    }
+	                }
+	                
+	                for (File file : files) {
+	                    if (file.isFile()) {
+	                    	String filePath = file.getAbsolutePath().replace("\\", "/");
+	                        if (pattern == null || matchesRegex(file.getName(), pattern)) {
+	                        	filePaths.add(filePath);
+	                        }
+	                    }
+	                }
+	            }
+	            
+	            return filePaths.toArray(new String[0]);
+	        } catch (Exception e) {
+	            throw new IllegalArgumentException("Error fetching file names", e);
+	        }
+	    }
+
+	  /**
+	   * Provides the path of the files in the given FTP server directory.
+	   */
+	  @Summary("Provides the path of the files in the given FTP server directory.")
+	  @MediaType(value = ANY, strict = false)
+	  public String[] getFilePathsFromFtp(@Alias("directoryPath") String directoryPath,@Optional @Alias("regex") String regex,@Alias("Host") String host,@Alias("Port") int port,@Alias("Username") String username,@Alias("password")@Password String password,@Alias("Timeout") @Optional(defaultValue = "8000")  int timeoutMillis) throws IllegalArgumentException {
+		  directoryPath.replace("\\", "/");
+		  
+	  //public String[] getFilePathsFromFtp(@Alias("directoryPath") String directoryPath,@Optional @Alias("regex") String regex, @Config ListFilePathsConfiguration configuration) throws IllegalArgumentException {
+	       /* String host=configuration.gethost();
+	        int port=configuration.getport();
+	        String username=configuration.getusername();
+	        String password=configuration.getpassword();
+	        int timeoutMillis=configuration.gettimeoutMillis();*/
+		  
+		  FTPClient ftpClient = new FTPClient();
+	        System.out.println("========= PATH: " + directoryPath + " REGEX: " +regex);
+	        try {
+	            ftpClient.connect(host, port);
+	            ftpClient.login(username, password);
+	            ftpClient.setConnectTimeout(timeoutMillis);
+	            ftpClient.enterLocalPassiveMode();
+	            
+	            System.out.println("Current working directory: " + ftpClient.printWorkingDirectory());
+	            
+	            System.out.println("Listing files and directories in the current directory:");
+	            FTPFile[] initialFiles = ftpClient.listFiles();
+	            for (FTPFile file : initialFiles) {
+	                String type = file.isDirectory() ? "Directory" : "File";
+	                System.out.println(type + ": " + file.getName());
+	            }
+	            
+	            System.out.println("Changing directory to: " + directoryPath);
+	            boolean changed = ftpClient.changeWorkingDirectory(directoryPath);
+	            if (!changed) {
+	                throw new IllegalArgumentException("Invalid directory path: " + directoryPath);
+	            }
+	            System.out.println("Changed directory to: " + directoryPath);
+	            System.out.println("Current working directory: " + ftpClient.printWorkingDirectory());
+	            
+	            FTPFile[] files = ftpClient.listFiles();
+	            
+	            if (files == null || files.length == 0) {
+	                throw new IllegalArgumentException("No files found in directory: " + directoryPath);
+	            }
+
+
+	            List<String> filePaths = new ArrayList<>();
+	            Pattern pattern = (regex != null && !regex.isEmpty()) ? Pattern.compile(regex) : null;
+
+	            for (FTPFile file : files) {
+	                if (file.isFile()) {
+	                    String fileName = file.getName();
+	                    if (pattern == null || matchesRegex(fileName, pattern)) {
+	                        filePaths.add((directoryPath + "/" + fileName).replace("//", "/"));
+	                        
+	                    }
+	                }
+	            }
+
+	            ftpClient.logout();
+	            ftpClient.disconnect();
+	            
+	            if (filePaths.isEmpty()) {
+	                System.out.println("No files matching the regex found in directory: " + directoryPath);
+	            }
+
+	            return filePaths.toArray(new String[0]);
+	        } catch (IOException e) {
+	            throw new IllegalArgumentException("Error fetching file paths from FTP", e);
+	        } finally {
+	            if (ftpClient.isConnected()) {
+	                try {
+	                    ftpClient.disconnect();
+	                } catch (IOException e) {
+	                	 throw new IllegalArgumentException("Error fetching file names", e);
+	                }
+	            }
+	        }
+	    } 
+	  
+	  
+	  /**
+	   * Provides the path of the files in the given SFTP server directory.
+	   */
+		  @MediaType(value = ANY, strict = false)
+		  @Summary("Provides the path of the files in the given SFTP server directory.")
+		  public String[] getFilePathsFromSFTP(@Alias("directoryPath") String directoryPath,@Optional @Alias("regex") String regex,@Alias("Host") String host,@Alias("Port") int port,@Alias("Username") String username,@Alias("password")@Password String password,@Alias("Timeout") @Optional(defaultValue = "8000")  int timeoutMillis) throws IllegalArgumentException {
+			  directoryPath.replace("\\", "/");
+		  //public String[] getFilePathsFromSFTP(@Alias("directoryPath") String directoryPath,@Optional @Alias("regex") String regex, @Config ListFilePathsConfiguration configuration) throws IllegalArgumentException {
+			  
+			  /* String host=configuration.gethost();
+		        int port=configuration.getport();
+		        String username=configuration.getusername();
+		        String password=configuration.getpassword();
+		        int timeoutMillis=configuration.gettimeoutMillis();*/
+			  System.out.println("========= PATH: " + directoryPath + " REGEX: " +regex);
+			  
+			  try {
+		          JSch jsch = new JSch();
+
+		          // Create session
+		          Session session = jsch.getSession(username, host, port);
+		          session.setPassword(password);
+
+		          // Set session options
+		          session.setConfig("StrictHostKeyChecking", "no");
+		          session.setTimeout(timeoutMillis);
+
+		          // Connect
+		          session.connect();
+
+		          // Create channel
+		          Channel channel = session.openChannel("sftp");
+		          channel.connect();
+
+		          // List files
+		          ChannelSftp sftpChannel = (ChannelSftp) channel;
+		          sftpChannel.cd(directoryPath);
+		          Vector files = sftpChannel.ls(".");
+		          
+		          // Filter files
+		          List<String> filePaths = new ArrayList<>();
+		          Pattern pattern = (regex != null && !regex.isEmpty()) ? Pattern.compile(regex) : null;
+		          for (Object obj : files) {
+		              ChannelSftp.LsEntry entry = (ChannelSftp.LsEntry) obj;
+		              if (!entry.getAttrs().isDir()) {
+		                  String fileName = entry.getFilename();
+		                  if (pattern == null || matchesRegex(fileName, pattern)) {
+		                      filePaths.add((directoryPath + "/" + fileName).replace("//", "/"));
+		                
+		                      
+		                  }
+		              }
+		          }
+
+		          // Disconnect
+		          sftpChannel.disconnect();
+		          session.disconnect();
+
+		          return filePaths.toArray(new String[0]);
+		      } catch (JSchException | SftpException e) {
+		          throw new IllegalArgumentException("Error fetching file paths from SFTP", e);
+		      }
+		  }
+	  
+	  
+	  
+	  
+	  
+	  
+
+  /**
+   * Private Method to check if the regex is matched or not
+   */
+	  private static boolean matchesRegex(String fileName, Pattern pattern) {
+	      Matcher matcher = pattern.matcher(fileName);
+	      boolean found = matcher.find();
+	      //System.out.println("filename: " + fileName + " regex: " + found);  
+	      return found;
+	     
+	  }
+}
