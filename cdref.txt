@@ -1,0 +1,342 @@
+DELL CD
+
+
+package archive_utility;
+
+import java.io.IOException;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.*;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+public class DelTmpFiles {
+	
+	public static void main(String args[]) throws IOException {
+		getFilePath("D:/Users/rnc9396/Downloads/ICRREPORT/tmp/", ".tmp","mule-","dw-");
+		
+		
+	}
+	
+	public static List<String> getFilePath(String directoryPath, String endswith,String startsWith1, String startsWith2) throws IOException {
+		List<String>response=new ArrayList<>();
+		try {
+			System.out.println("==== fetching file paths from path: "+directoryPath + " which ends with: "+endswith) ;
+			Stream<Path> stream = Files.list(Paths.get(directoryPath));
+			 response= stream.filter(file -> !Files.isDirectory(file))
+					.map(Path::toAbsolutePath)
+					.map(Path::toString)
+					.map(file -> file.toString().trim())
+			
+					.filter(file -> (endswith == null || endswith.isEmpty() || file.endsWith(endswith)) && (file.contains("mule-buffer") || file.contains("dw-buffer")))
+				    .map(file-> file.toString().replace("\\", "/"))
+					.collect(Collectors.toList());
+			
+			 System.out.println("==== fetched total " + response.size() +" file paths");
+			
+		}
+		catch(Exception e) {
+			System.out.println("==== could not fetch file paths which regex: "+endswith +" from path: "+directoryPath);
+			e.printStackTrace();
+		}
+		return response;
+	}
+	
+	
+	
+	public static Map<String,Object> fileattr (String path){
+		Map<String, Object> response = new HashMap<>();
+		{
+	        Path filePath = Paths.get(path);
+
+	        try {
+	        	BasicFileAttributes attr = Files.readAttributes(filePath, BasicFileAttributes.class);
+	        	response.put("Lastmodifiedtime", attr.lastModifiedTime());
+	        	response.put("Lastaccesstime", attr.lastAccessTime());
+	        	response.put("creationtime",attr.creationTime());
+	        	response.put("filesize",attr.size());
+	        	response.put("path",path.toString().replace("\\", "/"));
+	        	
+	           
+	        } catch (IOException e) {
+	            System.err.println("Error reading attributes: " + e.getMessage());
+	        }
+	    }
+		return response;
+	}
+	
+	
+		
+			}
+
+
+
+
+
+
+
+
+
+
+==========================
+
+
+
+LIST FILE PATHS CD
+
+
+
+
+package archive_utility;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+
+public class ListFilePaths {
+
+
+
+public static List<String> getFilePath(String directoryPath, String endswith) throws IOException {
+	List<String>response=new ArrayList<>();
+	try {
+		System.out.println("==== fetching file paths from path: "+directoryPath + " which ends with: "+endswith) ;
+		Stream<Path> stream = Files.list(Paths.get(directoryPath));
+		 response= stream.filter(file -> !Files.isDirectory(file))
+				.map(Path::toAbsolutePath)
+				.map(Path::toString)
+				.filter(file -> endswith == null || endswith.isEmpty() || file.endsWith(endswith))
+				.map(file-> file.toString().replace("\\", "/"))
+				.collect(Collectors.toList());
+		
+		 System.out.println("==== fetched total " + response.size() +" file paths");
+		
+	}
+	catch(Exception e) {
+		System.out.println("==== could not fetch file paths which regex: "+endswith +" from path: "+directoryPath);
+		e.printStackTrace();
+	}
+	return response;
+}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+=========================
+
+
+SEC ARCH CD
+
+
+
+
+
+package archive_utility; 
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import net.lingala.zip4j.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.model.FileHeader;
+import net.lingala.zip4j.model.ZipParameters;
+import net.lingala.zip4j.model.enums.AesKeyStrength;
+import net.lingala.zip4j.model.enums.EncryptionMethod;
+
+public class SecuredArchive {
+	
+		
+	
+
+	 public static Map<String, Object> zipMultipleFiles(String[] filePaths, String password, String outputDirectory, String outputFolder, String extension, boolean deleteAfterZip) throws Exception {
+	        System.out.println("==== Archival process started");
+	        File zipFile = null;
+	   		String deletedresp="";
+	   		String currntzippedfile="";
+	   		List<String> succarclist = new ArrayList<>();
+	   		List<String> errarclist = new ArrayList<>();
+	        int fileamt = 0;
+	       
+	        Map<String, Object> response = new HashMap<>();
+	        if(filePaths.length != 0)
+	        {
+	        	try {
+   
+	        		 ZipParameters zipParameters = new ZipParameters();
+	                 zipParameters.setEncryptFiles(true);
+	                 zipParameters.setEncryptionMethod(EncryptionMethod.AES);
+	                 zipParameters.setAesKeyStrength(AesKeyStrength.KEY_STRENGTH_256);
+	                 
+	                zipFile = new File(outputDirectory + File.separator + outputFolder + "." + extension);
+	 	            ZipFile zipFileObject = new ZipFile(zipFile, password.toCharArray());
+	 	            
+	        	    System.out.println("==== Creating archive folder at: " + (outputDirectory + File.separator + outputFolder + "." + extension).replace("\\", "/"));
+	        	     
+	        	    for(int fl=0; fl<filePaths.length; fl++) {
+	        	    	 
+	        	    	 try {
+	        	    		 
+	        	    		 zipFileObject.addFile(filePaths[fl], zipParameters);
+	        	    		 
+	        	    		 //add file name to success list
+	        	    		 succarclist.add(filePaths[fl].replace("\\", "/"));
+	        	    		 fileamt=fl;
+	        	    		 
+	        	    	 }catch(Exception e) {
+	        	    		 
+	        	    		//add file name to error list
+	        	    		 errarclist.add(filePaths[fl].replace("\\", "/"));
+	        	    	 }
+	        	    	
+	     		       
+	        	     }
+	        	    
+	        	    
+       	    	 // Delete original files if deleteAfterZip is true (will delete only the files which are successfully archived)
+    	            if (deleteAfterZip && succarclist.size()>0) {
+    	            	
+    	            	deletedresp= filedelete(succarclist);
+    	            }
+    	            	
+	        	    
+	        	    //create response
+
+	     		       if(succarclist.size()>0 && errarclist.size()==0) {
+	     		    	  response.put("status", "success");
+	     		    	  response.put("description", "Successfully archived total " + succarclist.size() + " files " + deletedresp );
+		     		      response.put("successlist", succarclist);
+		     		      response.put("outputPath", zipFile.getAbsolutePath().replace("\\", "/"));
+	     		       } else if(succarclist.size()==0 && errarclist.size()>0) {
+	     		    	  response.put("status", "failed");
+	     		    	  response.put("description", "failed to archive any file");
+		     		      response.put("errorlist", errarclist);
+		     		      response.put("outputPath", zipFile.getAbsolutePath().replace("\\", "/"));
+	     		       } else if(succarclist.size()>0 && errarclist.size()>0) {
+	     		    	  response.put("status", "partial-success");
+	     		    	  response.put("description", "Successfully archived " + succarclist.size() + " files out of " + filePaths.length + " files" + deletedresp );
+		     		      response.put("successlist", succarclist );
+		     		      response.put("errorlist", errarclist );
+		     		      response.put("outputPath", zipFile.getAbsolutePath().replace("\\", "/"));
+	     		       }
+	           
+	            
+	        	
+	        }
+	        	catch (Exception e) {
+	            //e.printStackTrace();
+	            response.put("status", "error");
+		        response.put("description", "Could not create folder for archival at " + (outputDirectory + File.separator + outputFolder + "." + extension).replace("\\", "/") );
+		        response.put("reason", e.toString() );
+
+	        }
+	     }
+	    else {
+     	response.put("status", "error");
+	    response.put("description", "archival process terminated" );
+	    response.put("reason", "cannot archive " + filePaths.length + " files"  );
+	       
+	    }
+	        
+	 System.out.println("==== Archival process completed with status: " +response.get("status") + " and description: "+response.get("description"));      
+	  return response;
+	  
+	        }
+	 
+	            
+	    
+	 
+	 public static  String  filedelete(List<String> succarclist) {
+		 String response="";
+		 try{
+			 for (String fileName : succarclist) {
+	                File sourceFile = new File(fileName);
+	                
+	                sourceFile.delete();
+	                
+	            }
+			response=" and deleted from source";
+            System.out.println("==== Files deleted from source path successfully");
+		 }catch(Exception e) {
+			 System.out.println("==== Files could not be deleted from source due to " + e.getMessage());
+		        response=" but could not delete from source";
+		 }
+		 return response;
+	 }
+	 
+	 
+	 
+	 
+	 public static Map<String, String> unzip(String zipFilePath, String password, String outputDirectory) throws ZipException {
+		 int fileCount=0;
+	        Map<String, String> response = new HashMap<>();
+	        
+	        System.out.println("==== Unzipping file...");
+	       
+	        try {
+	            ZipFile zipFile = new ZipFile(zipFilePath, password.toCharArray());
+	            zipFile.extractAll(outputDirectory);
+	            System.out.println("==== Files unzipped successfully!");
+
+	            // Count the number of files extracted
+	            File outputDir = new File(outputDirectory);
+	            fileCount = outputDir.listFiles().length;
+	            System.out.println("==== Number of files extracted: " + fileCount + " Extracted to: " + outputDirectory);
+	            //System.out.println("Extracted to: " + outputDirectory);
+	        } catch (ZipException e) {
+	            e.printStackTrace();
+	            throw e;
+	        }
+	        
+	        //create response
+	        
+	        response.put("status", "success");
+	        response.put("description", "Successfully unzipped total " + fileCount + " files from: " + zipFilePath + " to location: " + outputDirectory);
+	        response.put("outputPath", outputDirectory);
+	        
+	        return response;
+	    }
+	 
+	 
+	}
+
+
+
+
+
+
+
+
+
+==========================
